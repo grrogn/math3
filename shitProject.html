@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dress Up — вероятность персонажа</title>
+<style>
+  body {
+    margin: 0;
+    background: #dcdcdc;
+    font-family: sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+  }
+
+  .scene {
+    display: flex;
+    align-items: center;
+    gap: 40px;
+    position: relative;
+  }
+
+  .stats {
+    width: 360px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.9);
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    padding: 10px 20px;
+    text-align: center;
+  }
+
+  .result {
+    margin-top: 10px;
+    font-weight: 700;
+    font-size: 48px;
+    color: #222;
+  }
+
+  #charProbability {
+    margin-top: 10px;
+    font-size: 18px;
+    color: #333;
+  }
+
+  .generate-btn {
+    width: 100%;
+    margin-top: 15px;
+    padding: 15px;
+    font-size: 18px;
+    background: #4caf50;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+  }
+
+  .generate-btn:hover {
+    background: #43a047;
+  }
+
+  .character {
+    position: relative;
+    width: 240px;
+    height: 480px;
+  }
+
+  .mannequin {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    height: 100%;
+    z-index: 0;
+  }
+
+  .part {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    image-rendering: auto;
+    transition: filter 0.3s ease;
+  }
+
+  .headwear { top: 0; width: 80px; z-index: 3; }
+  .torso { top: 80px; width: 180px; z-index: 2; }
+  .legs { top: 200px; width: 140px; z-index: 1; }
+  .feet { top: 400px; width: 120px; z-index: 2; }
+
+  .controls {
+    display: flex;
+    flex-direction: column;
+    gap: 50px;
+    z-index: 30;
+  }
+
+  .control-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .control-row span {
+    min-width: 120px;
+  }
+
+  button {
+    border: none;
+    background: #333;
+    color: white;
+    padding: 5px 10px;
+    cursor: pointer;
+    border-radius: 5px;
+  }
+
+  .palette {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    gap: 5px;
+  }
+
+  .color {
+    width: 25px;
+    height: 25px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 1px solid #aaa;
+  }
+
+  #probabilities {
+    position: fixed;
+    left: 10px;
+    bottom: 10px;
+    background: rgba(255,255,255,0.8);
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    padding: 10px 15px;
+    font-size: 14px;
+    line-height: 1.5em;
+    color: #222;
+  }
+
+  @media (max-width: 700px) {
+    .scene { flex-direction: column; }
+    .stats { order: -1; width: auto; }
+  }
+</style>
+</head>
+<body>
+  <div class="palette" id="palette"></div>
+
+  <div class="scene">
+    <div class="stats">
+      <div id="formula"></div>
+      <div class="result" id="result"></div>
+      <div id="charProbability"></div>
+      <button id="randomizeBtn" class="generate-btn">Сгенерировать</button>
+    </div>
+
+    <div class="character">
+      <img src="man.png" alt="манекен" class="mannequin" id="mannequin">
+      <img id="headwear" class="part headwear" src="">
+      <img id="torso" class="part torso" src="">
+      <img id="legs" class="part legs" src="">
+      <img id="feet" class="part feet" src="">
+    </div>
+
+    <div class="controls">
+      <div class="control-row">
+        <button onclick="changePart('headwear', -1)">◀</button>
+        <button onclick="changePart('headwear', 1)">▶</button>
+        <span>Головной убор</span>
+      </div>
+      <div class="control-row">
+        <button onclick="changePart('torso', -1)">◀</button>
+        <button onclick="changePart('torso', 1)">▶</button>
+        <span>Верх</span>
+      </div>
+      <div class="control-row">
+        <button onclick="changePart('legs', -1)">◀</button>
+        <button onclick="changePart('legs', 1)">▶</button>
+        <span>Низ</span>
+      </div>
+      <div class="control-row">
+        <button onclick="changePart('feet', -1)">◀</button>
+        <button onclick="changePart('feet', 1)">▶</button>
+        <span>Обувь</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="probabilities"></div>
+
+<script>
+  const outfits = {
+    headwear: ["", "головной_убор/панамка.png", "головной_убор/ковбой.png", "головной_убор/шапка.png"],
+    torso: ["", "тело/футболка.png", "тело/рубашка.png", "тело/толстовка.png", "тело/топ.png", "тело/куртка.png", "тело/жилетка.png"],
+    legs: ["", "ноги/шорты.png", "ноги/брюки.png", "ноги/юбка.png", "ноги/юбкаД.png"],
+    feet: ["", "стопы/туфли.png", "стопы/каблуки.png", "стопы/кроссовки.png"]
+  };
+
+  const colors = ['#f44336', '#ff9800', '#ffeb3b', '#4caf50', '#2196f3', '#9c27b0'];
+
+  const state = { headwear: 0, torso: 0, legs: 0, feet: 0, color: '#ffffff', lastChanged: null };
+
+  function changePart(part, dir) {
+    const arr = outfits[part];
+    state[part] = (state[part] + dir + arr.length) % arr.length;
+    const el = document.getElementById(part);
+    const img = arr[state[part]];
+    el.src = img ? img : "";
+    el.style.filter = img ? "grayscale(1) opacity(0.8)" : "none";
+    state.lastChanged = part;
+    updateStats();
+    updateCharacterProbability();
+  }
+
+  function applyColorToPart(part, color) {
+    const el = document.getElementById(part);
+    el.style.filter = `grayscale(1) sepia(1) saturate(8000%) hue-rotate(${getHue(color)}deg) brightness(1) opacity(0.8)`;
+  }
+
+  function getHue(hex) {
+    const r = parseInt(hex.substr(1, 2), 16) / 255;
+    const g = parseInt(hex.substr(3, 2), 16) / 255;
+    const b = parseInt(hex.substr(5, 2), 16) / 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h;
+    if (max === min) h = 0;
+    else if (max === r) h = (60 * ((g - b) / (max - min)) + 360) % 360;
+    else if (max === g) h = (60 * ((b - r) / (max - min)) + 120) % 360;
+    else h = (60 * ((r - g) / (max - min)) + 240) % 360;
+    return Math.round(h);
+  }
+
+  const palette = document.getElementById('palette');
+  colors.forEach(c => {
+    const el = document.createElement('div');
+    el.className = 'color';
+    el.style.background = c;
+    el.onclick = () => {
+      state.color = c;
+      if (state.lastChanged) applyColorToPart(state.lastChanged, c);
+      updateCharacterProbability();
+    };
+    palette.appendChild(el);
+  });
+
+  function init() {
+    for (let part in outfits) {
+      const el = document.getElementById(part);
+      el.src = "";
+      el.style.filter = "none";
+    }
+    updateStats();
+  }
+
+  function updateStats() {
+    const total =
+      outfits.headwear.length *
+      outfits.torso.length *
+      outfits.legs.length *
+      outfits.feet.length *
+      colors.length;
+
+    document.getElementById("formula").textContent =
+      `${outfits.headwear.length} головных убора × ${outfits.torso.length} верха × ${outfits.legs.length} низа × ${outfits.feet.length} обуви × ${colors.length} цветов =`;
+    document.getElementById("result").textContent = total + " комбинаций";
+
+    const probsDiv = document.getElementById("probabilities");
+    probsDiv.innerHTML = `
+      <b>Вероятности выпадения:</b><br>
+      Головной убор: 1 / ${outfits.headwear.length} = ${(100 / outfits.headwear.length).toFixed(2)}% (${outfits.headwear.length-1} вида одежды + без головного убора)<br>
+      Верх: 1 / ${outfits.torso.length} = ${(100 / outfits.torso.length).toFixed(2)}% (${outfits.torso.length-1} видов одежды + без верха)<br>
+      Низ: 1 / ${outfits.legs.length} = ${(100 / outfits.legs.length).toFixed(2)}% (${outfits.legs.length-1} вида одежды + без низа)<br>
+      Обувь: 1 / ${outfits.feet.length} = ${(100 / outfits.feet.length).toFixed(2)}% (${outfits.feet.length-1} вида одежды + без обуви)<br>
+      Цвет: 1 / ${colors.length} = ${(100 / colors.length).toFixed(2)}% (вероятность цветов одинакова)
+    `;
+  }
+
+  function calculateCharacterProbability() {
+    const total =
+      outfits.headwear.length *
+      outfits.torso.length *
+      outfits.legs.length *
+      outfits.feet.length *
+      colors.length;
+    const p = 1 / total;
+    return { percent: (p * 100).toFixed(8), total };
+  }
+
+  function updateCharacterProbability() {
+    const { percent, total } = calculateCharacterProbability();
+    document.getElementById("charProbability").innerHTML =
+      `Вероятность выпадения текущего персонажа: <b>${(1/3360).toFixed(7)}%</b><br>` +
+      `<small>(1 / ${total} = 1 из ${total} возможных комбинаций)</small>`;
+  }
+
+  function randomizeCharacter() {
+    for (let part in outfits) {
+      const randomIndex = Math.floor(Math.random() * outfits[part].length);
+      const randomColor = colors[Math.floor(Math.random() * colors.length)];
+      state[part] = randomIndex;
+      const el = document.getElementById(part);
+      const img = outfits[part][randomIndex];
+      el.src = img ? img : "";
+      if (img) applyColorToPart(part, randomColor);
+      else el.style.filter = "none";
+    }
+    updateCharacterProbability();
+  }
+
+  document.getElementById('randomizeBtn').addEventListener('click', randomizeCharacter);
+  init();
+</script>
+</body>
+</html>
